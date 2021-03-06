@@ -1,0 +1,9 @@
+{
+  "rds": {
+    "exampledb": {
+        "service": "RDSCluster",
+        "providerPlugin": "awscloudformation",
+        "dependsOn": []
+    }
+  }
+}

@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS CloudFormation Template that creates an Aurora serverless database cluster.
+Parameters:
+  DBUserName:
+    Type: String
+    Description: An admin user name, e.g. admin. Stored in a SecretManager secret.
+  DBClusterName:
+    Type: String
+    Description: The root name for the DB cluster. Combined with the 'env' parameter value to form the cluster ID.
+  autoPause:
+    Type: String
+    Description: Indicates whether to allow or disallow automatic pause for an Aurora DB cluster in serverless DB engine mode.
+  minCapacity:
+    Type: Number
+    Description: The minimum capacity for an Aurora DB cluster in serverless DB engine mode.
+  maxCapacity:
+    Type: Number
+    Description: The maximum capacity for an Aurora DB cluster in serverless DB engine mode.
+  secondsUntilAutoPause:
+    Type: Number
+    Description: The time, in seconds, before an Aurora DB cluster in serverless mode is paused after last client disconnects.
+  env:
+    Type: String
+    Description: The environment name. e.g. dev, test, or prod.
+    Default: NONE
+Conditions:
+  HasEnvironmentParameter: !Not 
+    - !Equals 
+      - !Ref env
+      - NONE
+Resources:
+  RDSSecret:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Description: A Secrets Manager secret that holds RDS DB credentials
+      GenerateSecretString:
+        SecretStringTemplate: !Join 
+          - ''
+          - - '{"username": "'
+            - !Ref DBUserName
+            - '"}'
+        GenerateStringKey: password
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+      Name: !Join 
+        - ''
+        - - rds-db-credentials/
+          - !If
+            - HasEnvironmentParameter
+            - !Join 
+              - ''
+              - - !Ref DBClusterName
+                - '-'
+                - !Ref env
+            - !Ref DBClusterName
+          - /
+          - !Ref DBUserName
+  RDSCluster:
+    Type: 'AWS::RDS::DBCluster'
+    Properties:
+      MasterUsername: !Join 
+        - ''
+        - - '{{resolve:secretsmanager:'
+          - !Ref RDSSecret
+          - ':SecretString:username}}'
+      MasterUserPassword: !Join 
+        - ''
+        - - '{{resolve:secretsmanager:'
+          - !Ref RDSSecret
+          - ':SecretString:password}}'
+      DBClusterIdentifier: !If 
+        - HasEnvironmentParameter
+        - !Join 
+          - ''
+          - - !Ref DBClusterName
+            - '-'
+            - !Ref env
+        - !Ref DBClusterName
+      Engine: aurora-mysql
+      EngineVersion: '5.7'
+      EngineMode: serverless
+      EnableHttpEndpoint: true
+      ScalingConfiguration:
+        AutoPause: !Ref autoPause
+        MinCapacity: !Ref minCapacity
+        MaxCapacity: !Ref maxCapacity
+        SecondsUntilAutoPause: !Ref secondsUntilAutoPause
+  SecretRDSInstanceAttachment:
+    Type: 'AWS::SecretsManager::SecretTargetAttachment'
+    Properties:
+      SecretId: !Ref RDSSecret
+      TargetId: !Ref RDSCluster
+      TargetType: 'AWS::RDS::DBCluster'
+Outputs:
+  Name:
+    Value: !Ref RDSCluster
+  Arn:
+    Value: !Join 
+      - ''
+      - - 'arn:'
+        - !Ref 'AWS::Partition'
+        - ':rds:'
+        - !Ref 'AWS::Region'
+        - ':'
+        - !Ref 'AWS::AccountId'
+        - ':cluster:'
+        - !If
+          - HasEnvironmentParameter
+          - !Join 
+            - ''
+            - - !Ref DBClusterName
+              - '-'
+              - !Ref env
+          - !Ref DBClusterName
+  SecretArn:
+    Value: !Ref RDSSecret

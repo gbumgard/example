@@ -1,0 +1,7 @@
+{
+  "DBUserName": "admin",
+  "DBClusterName": "exampledb",
+  "ResourceLambdaFunction": "rdsSqlDocumentLoader",
+  "Delimiter": ";",
+  "Database": "exampledb"
+}
