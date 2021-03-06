@@ -144,11 +144,13 @@ function parseStatements(sql, delimiter) {
 function executeSql(params) {
   return new Promise((resolve, reject) => {
     console.log(["Executing SQL statement:",params.sql]);
+    /*
     if (params.sql.toUpperCase().startsWith("USE")) {
       var db = params.sql.split(/\s+/)[1];
       params.database = db.substring(0,db.length-1);
       console.log(["Switching to database: "+params.database]);
     }
+    */
     RDS.executeStatement(params, (err, result) => {
       if (err) {
         console.warn(["SQL statement execution failed with error:",err]);

@@ -94,12 +94,11 @@ Resources:
           - !Ref DBUserName
 
       CreateSqlDocument: |
-        DROP TABLE User;
+        DROP TABLE IF EXISTS User;
         CREATE TABLE IF NOT EXISTS User (userId BINARY(16));
         INSERT INTO User (userId) VALUES (0x1);
-        INSERT INTO User (userId) VALUES (0x2);
         SELECT HEX(userId) as "userId" FROM User;
-
+        DROP DATABASE exampledb;
 
       Database: !Ref Database
       Delimiter: !Ref Delimiter
