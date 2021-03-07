@@ -48,61 +48,78 @@ Resources:
     Type: Custom::RdsSqlResource
     Properties:
       Region: !Ref "AWS::Region"
-      ServiceToken: !Join
-        - ''
-        - - 'arn:'
-          - !Ref 'AWS::Partition'
-          - ':lambda:'
-          - !Ref 'AWS::Region'
-          - ':'
-          - !Ref 'AWS::AccountId'
-          - ':function:'
-          - !If
-            - HasEnvironmentParameter
-            - !Join 
-              - ''
-              - - !Ref ResourceLambdaFunction
-                - '-'
-                - !Ref env
-            - !Ref ResourceLambdaFunction
-      ClusterArn: !Join 
-        - ''
-        - - 'arn:'
-          - !Ref 'AWS::Partition'
-          - ':rds:'
-          - !Ref 'AWS::Region'
-          - ':'
-          - !Ref 'AWS::AccountId'
-          - ':cluster:'
-          - !If
-            - HasEnvironmentParameter
-            - !Join 
-              - ''
-              - - !Ref DBClusterName
-                - '-'
-                - !Ref env
-            - !Ref DBClusterName
-      SecretArn: !Join 
-        - ''
-        - - 'rds-db-credentials/'
-          - !Join 
-            - ''
-            - - !Ref DBClusterName
-              - '-'
-              - !Ref env
-          - '/'
-          - !Ref DBUserName
-
-      CreateSqlDocument: |
-        DROP TABLE IF EXISTS User;
-        CREATE TABLE IF NOT EXISTS User (userId BINARY(16));
-        INSERT INTO User (userId) VALUES (0x1);
-        SELECT HEX(userId) as "userId" FROM User;
-        DROP DATABASE exampledb;
+      ServiceToken: !Ref functionrdsSqlDocumentLoaderArn
+#      ServiceToken: !Join
+#        - ''
+#        - - 'arn:'
+#          - !Ref 'AWS::Partition'
+#          - ':lambda:'
+#          - !Ref 'AWS::Region'
+#          - ':'
+#          - !Ref 'AWS::AccountId'
+#          - ':function:'
+#          - !If
+#            - HasEnvironmentParameter
+#            - !Join 
+#              - ''
+#              - - !Ref ResourceLambdaFunction
+#                - '-'
+#                - !Ref env
+#            - !Ref ResourceLambdaFunction
+      ClusterArn: !Ref rdsexampledbArn
+#      ClusterArn: !Join 
+#        - ''
+#        - - 'arn:'
+#          - !Ref 'AWS::Partition'
+#          - ':rds:'
+#          - !Ref 'AWS::Region'
+#          - ':'
+#          - !Ref 'AWS::AccountId'
+#          - ':cluster:'
+#          - !If
+#            - HasEnvironmentParameter
+#            - !Join 
+#              - ''
+#              - - !Ref DBClusterName
+#                - '-'
+#                - !Ref env
+#            - !Ref DBClusterName
+      SecretArn: !Ref rdsexampledbSecretArn
+#      SecretArn: !Join 
+#        - ''
+#        - - 'rds-db-credentials/'
+#          - !Join 
+#            - ''
+#            - - !Ref DBClusterName
+#              - '-'
+#              - !Ref env
+#          - '/'
+#          - !Ref DBUserName
 
       Database: !Ref Database
       Delimiter: !Ref Delimiter
-  
+      CreateSqlDocument: |
+
+        DROP TABLE IF EXISTS User;
+        
+        CREATE TABLE IF NOT EXISTS User (
+          userId BINARY(16) PRIMARY KEY,
+          createdAt DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+          updatedAt DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+        );
+        
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+
+        SELECT HEX(userId) as 'userId',
+               REPLACE(createdAt,' ','T') as 'createdAt',
+               REPLACE(updatedAt,' ','T') as 'updatedAt' FROM User;
+         
+        DROP DATABASE exampledb;
+
 Outputs:
   RdsSqlResource:
     Value: !Ref RdsSqlResource
