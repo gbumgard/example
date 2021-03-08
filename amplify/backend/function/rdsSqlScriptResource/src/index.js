@@ -57,39 +57,39 @@ exports.handler = async (event, context) => {
     }
 
     var physicalResourceId;
-    if (event.ResourceProperties.CreateSqlDocument === null) {
-      event.ResourceProperties.CreateSqlDocument = initDb;
+    if (event.ResourceProperties.CreateSqlScript === null) {
+      event.ResourceProperties.CreateSqlScript = initDb;
     }
     else {
-      event.ResourceProperties.CreateSqlDocument = initDb + event.ResourceProperties.CreateSqlDocument;
+      event.ResourceProperties.CreateSqlScript = initDb + event.ResourceProperties.CreateSqlScript;
     }
 
-    // Use hash of the Create document as the physical resource ID.
-    // This hash is also used to detect changes in the Create document.
-    // Changing the Create document will force generation of a new PhysicalResourceId
-    physicalResourceId = crypto.createHash('md5').update(event.ResourceProperties.CreateSqlDocument).digest('hex');
+    // Use hash of the Create script as the physical resource ID.
+    // This hash is also used to detect changes in the Create script.
+    // Changing the Create script will force generation of a new PhysicalResourceId
+    physicalResourceId = crypto.createHash('md5').update(event.ResourceProperties.CreateSqlScript).digest('hex');
 
     var sql = "";
 
     if (event.RequestType == "Create") {
-      sql = event.ResourceProperties.CreateSqlDocument;
+      sql = event.ResourceProperties.CreateSqlScript;
       // The function must return a physical resource ID for the resource.
       // This value will be sent in the next event and used to check for SQL property changes
       event.PhysicalResourceId = physicalResourceId;
     }
     else if (event.RequestType == "Update") {
-      // Use the UpdateSqlDocument property if it exists otherwise use the CreateSqlDocument property.
-      if (event.ResourceProperties.UpdateSqlDocument) {
+      // Use the UpdateSqlScript property if it exists otherwise use the CreateSqlScript property.
+      if (event.ResourceProperties.UpdateSqlScript) {
         if (event.ResourceProperties.Database) {
           rdsArgs.database = event.ResourceProperties.Database;
         }
-        sql = event.ResourceProperties.UpdateSqlDocument;
+        sql = event.ResourceProperties.UpdateSqlScript;
       }
       else if (physicalResourceId != event.PhysicalResourceId) {
         // The physical resource ID must be updated when the resource is changed.
         // This value will be sent in the next event.
         event.PhysicalResourceId = physicalResourceId;
-        sql = event.ResourceProperties.CreateSqlDocument;
+        sql = event.ResourceProperties.CreateSqlScript;
       }
     }
     else {
@@ -98,7 +98,7 @@ exports.handler = async (event, context) => {
       return event;
     }
 
-    // Parse the document into individual SQL statements
+    // Parse the script into individual SQL statements
     var statements = parseStatements(sql, delimiter);
     console.log(statements);
 
@@ -114,7 +114,7 @@ exports.handler = async (event, context) => {
       }
     }
     // Report success and results. The results may be used as a CF output.
-    await sendCFResponse(event, context, "SUCCESS", { results: JSON.stringify(results) }).catch(e => { });
+    await sendCFResponse(event, context, "SUCCESS", { results: JSON.stringify({}) }).catch(e => { });
   }
   catch (err) {
     // Catch everything else - the handler must send a SUCCESS response to avoid hanging stack.
@@ -126,7 +126,7 @@ exports.handler = async (event, context) => {
 };
 
 // Regex that matches one or more spaces.
-let whitespace = /\s+/;
+let whitespace = /[\s\n]+/;
 
 /**
  * Parse string of SQL statements separated by delimiter characters (or newlines).
@@ -151,14 +151,19 @@ function parseStatements(sql, delimiter) {
       isDelimiterCommand = true;
     }
 
-    // Extract the statement from the document string
-    var statement = sql.substring(0, sql.indexOf(delimiter) + delimiter.length).replace('\n', ' ');
+    // Extract the statement from the script string
+    var delimiterPos = sql.indexOf(delimiter);
+    if ((delimiterPos + 1) < sql.length && sql[delimiterPos+1] == delimiter) {
+      delimiterPos++;
+    }
+
+    var statement = sql.substring(0, sql.indexOf(delimiter));
 
     // Execute if NOT a DELIMITER command
     if (!isDelimiterCommand) statements.push(statement);
 
     // Advance to the next statement
-    sql = sql.substring(statement.length);
+    sql = sql.substring(statement.length+delimiter.length);
   }
 
   return statements;

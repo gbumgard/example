@@ -23,12 +23,15 @@ Parameters:
   Database:
     Type: String
 
+  NoEcho:
+    Type: String
+
   env:
     Type: String
     Description: The environment name. e.g. dev, test, or prod.
     Default: NONE
 
-  functionrdsSqlDocumentLoaderArn:
+  functionrdsSqlScriptResourceArn:
     Type: String
 
   rdsexampledbArn:
@@ -48,57 +51,31 @@ Resources:
     Type: Custom::RdsSqlResource
     Properties:
       Region: !Ref "AWS::Region"
-      ServiceToken: !Ref functionrdsSqlDocumentLoaderArn
-#      ServiceToken: !Join
-#        - ''
-#        - - 'arn:'
-#          - !Ref 'AWS::Partition'
-#          - ':lambda:'
-#          - !Ref 'AWS::Region'
-#          - ':'
-#          - !Ref 'AWS::AccountId'
-#          - ':function:'
-#          - !If
-#            - HasEnvironmentParameter
-#            - !Join 
-#              - ''
-#              - - !Ref ResourceLambdaFunction
-#                - '-'
-#                - !Ref env
-#            - !Ref ResourceLambdaFunction
+      ServiceToken: !Ref functionrdsSqlScriptResourceArn
       ClusterArn: !Ref rdsexampledbArn
-#      ClusterArn: !Join 
-#        - ''
-#        - - 'arn:'
-#          - !Ref 'AWS::Partition'
-#          - ':rds:'
-#          - !Ref 'AWS::Region'
-#          - ':'
-#          - !Ref 'AWS::AccountId'
-#          - ':cluster:'
-#          - !If
-#            - HasEnvironmentParameter
-#            - !Join 
-#              - ''
-#              - - !Ref DBClusterName
-#                - '-'
-#                - !Ref env
-#            - !Ref DBClusterName
       SecretArn: !Ref rdsexampledbSecretArn
-#      SecretArn: !Join 
-#        - ''
-#        - - 'rds-db-credentials/'
-#          - !Join 
-#            - ''
-#            - - !Ref DBClusterName
-#              - '-'
-#              - !Ref env
-#          - '/'
-#          - !Ref DBUserName
-
       Database: !Ref Database
       Delimiter: !Ref Delimiter
-      CreateSqlDocument: |
+      NoEcho: !Ref NoEcho
+      CreateSqlScript: |
+
+        DROP FUNCTION IF EXISTS bin_to_uuid;
+        DROP FUNCTION IF EXISTS uuid_to_bin;
+
+        DELIMITER $$
+        CREATE FUNCTION bin_to_uuid(b BINARY(16))
+            RETURNS CHAR(36) DETERMINISTIC
+            BEGIN
+                DECLARE HEX CHAR(32);
+                SET HEX = HEX(b);
+                RETURN LOWER(CONCAT(LEFT(HEX, 8), '-', MID(HEX, 9,4), '-', MID(HEX, 13,4), '-', MID(HEX, 17,4), '-', RIGHT(HEX, 12)));
+            END
+        $$
+        DELIMITER ;
+
+        CREATE FUNCTION uuid_to_bin(s CHAR(36))
+            RETURNS BINARY(16) DETERMINISTIC
+            RETURN UNHEX(CONCAT(LEFT(s, 8), MID(s, 10, 4), MID(s, 15, 4), MID(s, 20, 4), RIGHT(s, 12)));
 
         DROP TABLE IF EXISTS User;
         
@@ -118,11 +95,10 @@ Resources:
                REPLACE(createdAt,' ','T') as 'createdAt',
                REPLACE(updatedAt,' ','T') as 'updatedAt' FROM User;
          
-        DROP DATABASE exampledb;
 
 Outputs:
   RdsSqlResource:
     Value: !Ref RdsSqlResource
-  Results :
-    Description: "The responses received for each statement in the SQL document."
-    Value: !GetAtt RdsSqlResource.results
+  #Results :
+  #  Description: "The responses received for each statement in the SQL document."
+  #  Value: !GetAtt RdsSqlResource.results

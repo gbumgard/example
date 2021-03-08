@@ -1,7 +1,8 @@
 {
   "DBUserName": "admin",
   "DBClusterName": "exampledb",
-  "ResourceLambdaFunction": "rdsSqlDocumentLoader",
+  "ResourceLambdaFunction": "rdsSqlScriptResource",
   "Delimiter": ";",
-  "Database": "exampledb"
+  "Database": "exampledb",
+  "NoEcho": true
 }

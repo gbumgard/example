@@ -37,6 +37,35 @@
         "rdsSqlDocumentLoader": {
           "deploymentBucketName": "amplify-example-dev-205931-deployment",
           "s3Key": "amplify-builds/rdsSqlDocumentLoader-693151545635572f6d51-build.zip"
+        },
+        "rdsSqlScriptResource": {
+          "deploymentBucketName": "amplify-example-dev-205931-deployment",
+          "s3Key": "amplify-builds/rdsSqlScriptResource-436a446156736b4a6250-build.zip"
+        }
+      }
+    }
+  },
+  "temp": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-example-temp-211520-authRole",
+      "UnauthRoleArn": "arn:aws:iam::407593329440:role/amplify-example-temp-211520-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::407593329440:role/amplify-example-temp-211520-authRole",
+      "Region": "us-west-2",
+      "DeploymentBucketName": "amplify-example-temp-211520-deployment",
+      "UnauthRoleName": "amplify-example-temp-211520-unauthRole",
+      "StackName": "amplify-example-temp-211520",
+      "StackId": "arn:aws:cloudformation:us-west-2:407593329440:stack/amplify-example-temp-211520/48492af0-7fcd-11eb-adfb-0afc3b6c9c9d",
+      "AmplifyAppId": "dsqhqp5npblo0"
+    },
+    "categories": {
+      "function": {
+        "rdsSqlDocumentLoader": {
+          "deploymentBucketName": "amplify-example-temp-211520-deployment",
+          "s3Key": "amplify-builds/rdsSqlDocumentLoader-35307a343962664e6979-build.zip"
+        },
+        "rdsSqlScriptResource": {
+          "deploymentBucketName": "amplify-example-temp-211520-deployment",
+          "s3Key": "amplify-builds/rdsSqlScriptResource-3234516a354854514365-build.zip"
         }
       }
     }
