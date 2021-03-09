@@ -161,7 +161,6 @@ Resources:
         INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
         INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
         INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
-        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
 
         SELECT HEX(userId) as 'userId',
               REPLACE(createdAt,' ','T') as 'createdAt',

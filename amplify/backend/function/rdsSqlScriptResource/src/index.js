@@ -18,7 +18,7 @@ const url = require("url");
  */
 exports.handler = async (event, context) => {
 
-  console.log(event)
+  console.info(event)
 
   try {
 
@@ -49,14 +49,14 @@ exports.handler = async (event, context) => {
 
 
     var physicalResourceId = crypto.createHash('md5').update(sql).digest('hex');
-    
+
     if (physicalResourceId != event.PhysicalResourceId) {
 
       event.PhysicalResourceId = physicalResourceId;
 
       // Parse the script into individual SQL statements
       var statements = parseStatements(sql, delimiter);
-      console.log(statements);
+      console.debug(statements);
 
       var results = [];
 
@@ -70,9 +70,7 @@ exports.handler = async (event, context) => {
         }
       }
 
-      console.log(JSON.stringify(results));
-
-
+      console.debug(results);
     }
     // Report success and results. The results may be used as a CF output.
     await sendCFResponse(event, context, "SUCCESS", {}).catch(e => { });
@@ -80,7 +78,7 @@ exports.handler = async (event, context) => {
   catch (err) {
     // Catch everything else
     // The handler must send a SUCCESS response for "Delete" avoid hanging stack on rollback.
-    console.log(err);
+    console.error(err);
     await sendCFResponse(event, context, event.RequestType == "Delete" ? "SUCCESS" : "FAILED", {}).catch(e => { });
   }
 
@@ -138,14 +136,13 @@ function parseStatements(sql, delimiter) {
  */
 function executeSql(params) {
   return new Promise((resolve, reject) => {
-    console.log(["Executing SQL statement:", params.sql]);
     RDS.executeStatement(params, (err, result) => {
       if (err) {
-        console.warn(`SQL statement '${params.sql}' failed with error ${err}`);
+        console.error(`statement '${params.sql}' failed with error ${err}`);
         reject(err)
       }
       else {
-        console.log([`SQL statement '${params.sql}' returned result:`, JSON.stringify(result)]);
+        console.info(`statement '${params.sql}' returned result:`,JSON.stringify(result));
         resolve(result);
       }
     });
@@ -181,7 +178,7 @@ function sendCFResponse(event, context, responseStatus, responseData) {
       }
     };
 
-    console.log("Sending CloudFormation response via HTTPS:", options, responseParameters);
+    console.info("Sending CloudFormation response:", options, responseParameters);
 
     var request = https.request(options, function (response) {
 
@@ -192,7 +189,7 @@ function sendCFResponse(event, context, responseStatus, responseData) {
       };
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        console.log(result)
+        console.error(result)
         reject(new Error(`CloudFormation rejected HTTPS request with statusCode: ${response.statusCode} statusMessage '${response.statusMessage}'`));
       }
       else {
@@ -204,20 +201,19 @@ function sendCFResponse(event, context, responseStatus, responseData) {
         });
 
         response.on('end', () => {
-          console.log(chunks);
           var body = {};
           if (chunks.length > 0) {
             body = JSON.parse(chunks.toString());
           }
           result.body = body;
-          console.log(result)
+          console.debug(result);
           resolve(body);
         });
       }
     });
 
     request.on("error", (err) => {
-      console.log(`CloudFormation HTTPS request failed with error: ${err.toString()}`);
+      console.error(`CloudFormation HTTPS request failed with error: ${err.toString()}`);
       reject(err);
     });
 
