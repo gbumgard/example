@@ -8,18 +8,25 @@ Parameters:
   DBClusterName:
     Type: String
     Description: The root name for the DB cluster. Combined with the 'env' parameter value to form the cluster ID.
-  autoPause:
+  AutoPause:
     Type: String
     Description: Indicates whether to allow or disallow automatic pause for an Aurora DB cluster in serverless DB engine mode.
-  minCapacity:
+  MinCapacity:
     Type: Number
     Description: The minimum capacity for an Aurora DB cluster in serverless DB engine mode.
-  maxCapacity:
+  MaxCapacity:
     Type: Number
     Description: The maximum capacity for an Aurora DB cluster in serverless DB engine mode.
-  secondsUntilAutoPause:
+  SecondsUntilAutoPause:
     Type: Number
     Description: The time, in seconds, before an Aurora DB cluster in serverless mode is paused after last client disconnects.
+  SqlDelimiter:
+    Type: String
+    Description: The initial SQL statement SqlDelimiter.
+  DatabaseName:
+    Type: String
+  functionrdsSqlScriptResourceArn:
+    Type: String
   env:
     Type: String
     Description: The environment name. e.g. dev, test, or prod.
@@ -82,16 +89,84 @@ Resources:
       EngineMode: serverless
       EnableHttpEndpoint: true
       ScalingConfiguration:
-        AutoPause: !Ref autoPause
-        MinCapacity: !Ref minCapacity
-        MaxCapacity: !Ref maxCapacity
-        SecondsUntilAutoPause: !Ref secondsUntilAutoPause
+        AutoPause: !Ref AutoPause
+        MinCapacity: !Ref MinCapacity
+        MaxCapacity: !Ref MaxCapacity
+        SecondsUntilAutoPause: !Ref SecondsUntilAutoPause
   SecretRDSInstanceAttachment:
     Type: 'AWS::SecretsManager::SecretTargetAttachment'
     Properties:
       SecretId: !Ref RDSSecret
       TargetId: !Ref RDSCluster
       TargetType: 'AWS::RDS::DBCluster'
+  RdsSqlResource:
+    Type: Custom::RdsSqlResource
+    UpdateReplacePolicy: Retain
+    DependsOn:
+      - RDSCluster
+      - RDSSecret
+    Properties:
+      Region: !Ref "AWS::Region"
+      ServiceToken: !Ref functionrdsSqlScriptResourceArn
+      DBClusterArn: !Join 
+        - ''
+        - - 'arn:'
+          - !Ref 'AWS::Partition'
+          - ':rds:'
+          - !Ref 'AWS::Region'
+          - ':'
+          - !Ref 'AWS::AccountId'
+          - ':cluster:'
+          - !If
+            - HasEnvironmentParameter
+            - !Join 
+              - ''
+              - - !Ref DBClusterName
+                - '-'
+                - !Ref env
+            - !Ref DBClusterName
+      DBSecretArn: !Ref RDSSecret
+      DatabaseName: !Ref DatabaseName
+      SqlDelimiter: !Ref SqlDelimiter
+      SqlScript: !Sub |
+
+        DROP FUNCTION IF EXISTS bin_to_uuid;
+        DROP FUNCTION IF EXISTS uuid_to_bin;
+
+        DELIMITER $$
+        CREATE FUNCTION bin_to_uuid(b BINARY(16))
+            RETURNS CHAR(36) DETERMINISTIC
+            BEGIN
+                DECLARE HEX CHAR(32);
+                SET HEX = HEX(b);
+                RETURN LOWER(CONCAT(LEFT(HEX, 8), '-', MID(HEX, 9,4), '-', MID(HEX, 13,4), '-', MID(HEX, 17,4), '-', RIGHT(HEX, 12)));
+            END
+        $$
+        DELIMITER ;
+
+        CREATE FUNCTION uuid_to_bin(s CHAR(36))
+            RETURNS BINARY(16) DETERMINISTIC
+            RETURN UNHEX(CONCAT(LEFT(s, 8), MID(s, 10, 4), MID(s, 15, 4), MID(s, 20, 4), RIGHT(s, 12)));
+
+        DROP TABLE IF EXISTS User;
+        
+        CREATE TABLE IF NOT EXISTS User (
+          userId BINARY(16) PRIMARY KEY,
+          createdAt DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+          updatedAt DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+        );
+        
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+
+        SELECT HEX(userId) as 'userId',
+              REPLACE(createdAt,' ','T') as 'createdAt',
+              REPLACE(updatedAt,' ','T') as 'updatedAt' FROM User;
+
 Outputs:
   Name:
     Value: !Ref RDSCluster
@@ -115,3 +190,5 @@ Outputs:
           - !Ref DBClusterName
   SecretArn:
     Value: !Ref RDSSecret
+  DatabaseName:
+    Value: !Ref DatabaseName

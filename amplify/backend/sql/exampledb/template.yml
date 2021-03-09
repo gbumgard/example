@@ -49,6 +49,7 @@ Conditions:
 Resources:
   RdsSqlResource:
     Type: Custom::RdsSqlResource
+    UpdateReplacePolicy: Retain
     Properties:
       Region: !Ref "AWS::Region"
       ServiceToken: !Ref functionrdsSqlScriptResourceArn
@@ -57,8 +58,8 @@ Resources:
       Database: !Ref Database
       Delimiter: !Ref Delimiter
       NoEcho: !Ref NoEcho
-      CreateSqlScript: |
-
+      CreateSqlScript: !Sub |
+        CREATE DATABASE IF NOT EXISTS ${Database};
         DROP FUNCTION IF EXISTS bin_to_uuid;
         DROP FUNCTION IF EXISTS uuid_to_bin;
 
@@ -86,14 +87,16 @@ Resources:
         );
         
         INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
+        SELECT LAST_INSERT_ID();
+        INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
         INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
         INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
         INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
         INSERT INTO User (userId) VALUES (UNHEX(REPLACE(UUID(),'-','')));
 
         SELECT HEX(userId) as 'userId',
-               REPLACE(createdAt,' ','T') as 'createdAt',
-               REPLACE(updatedAt,' ','T') as 'updatedAt' FROM User;
+              REPLACE(createdAt,' ','T') as 'createdAt',
+              REPLACE(updatedAt,' ','T') as 'updatedAt' FROM User;
          
 
 Outputs:

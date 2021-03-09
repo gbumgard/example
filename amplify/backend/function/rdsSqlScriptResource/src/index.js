@@ -28,96 +28,58 @@ exports.handler = async (event, context) => {
       return event;
     }
 
-    var config = await (async () => {
-      const sts = new AWS.STS();
-      const { Account: account } = await sts.getCallerIdentity({}).promise();
-      const { ARN: secretArn } = await secretsmanager.describeSecret({ SecretId: event.ResourceProperties.SecretArn }).promise();
-      var clusterArn = event.ResourceProperties.ClusterArn;
-      return { account, clusterArn, secretArn };
-    })();
-
+    const { ARN: secretArn } = await secretsmanager.describeSecret({ SecretId: event.ResourceProperties.DBSecretArn }).promise();
+    
     var rdsArgs = {
-      secretArn: config.secretArn,
-      resourceArn: config.clusterArn,
+      secretArn: secretArn,
+      resourceArn: event.ResourceProperties.DBClusterArn,
       sql: "",
       database: "",
       includeResultMetadata: true
     }
 
-    var delimiter = event.ResourceProperties.Delimiter;
-    if (!delimiter) delimiter = ";";
-
-    var initDb = "";
-
-    // Always attempt to create the specified database
-    if (event.ResourceProperties.Database) {
-      // Create the database if it does not yet exist
-      initDb += "CREATE DATABASE IF NOT EXISTS " + event.ResourceProperties.Database + delimiter;
-      initDb += "USE " + event.ResourceProperties.Database + delimiter;
-    }
-
-    var physicalResourceId;
-    if (event.ResourceProperties.CreateSqlScript === null) {
-      event.ResourceProperties.CreateSqlScript = initDb;
-    }
-    else {
-      event.ResourceProperties.CreateSqlScript = initDb + event.ResourceProperties.CreateSqlScript;
-    }
-
-    // Use hash of the Create script as the physical resource ID.
-    // This hash is also used to detect changes in the Create script.
-    // Changing the Create script will force generation of a new PhysicalResourceId
-    physicalResourceId = crypto.createHash('md5').update(event.ResourceProperties.CreateSqlScript).digest('hex');
+    var delimiter = event.ResourceProperties.SqlDelimiter;
+    var database = event.ResourceProperties.DatabaseName;
 
     var sql = "";
 
-    if (event.RequestType == "Create") {
-      sql = event.ResourceProperties.CreateSqlScript;
-      // The function must return a physical resource ID for the resource.
-      // This value will be sent in the next event and used to check for SQL property changes
+    sql += "CREATE DATABASE IF NOT EXISTS " + database + delimiter;
+    sql += "USE " + database + delimiter;
+    sql += event.ResourceProperties.SqlScript;
+
+
+    var physicalResourceId = crypto.createHash('md5').update(sql).digest('hex');
+    
+    if (physicalResourceId != event.PhysicalResourceId) {
+
       event.PhysicalResourceId = physicalResourceId;
-    }
-    else if (event.RequestType == "Update") {
-      // Use the UpdateSqlScript property if it exists otherwise use the CreateSqlScript property.
-      if (event.ResourceProperties.UpdateSqlScript) {
-        if (event.ResourceProperties.Database) {
-          rdsArgs.database = event.ResourceProperties.Database;
+
+      // Parse the script into individual SQL statements
+      var statements = parseStatements(sql, delimiter);
+      console.log(statements);
+
+      var results = [];
+
+      // Execute each SQL statement
+      for (var statement of statements) {
+        if (statement.length > 0) {
+          rdsArgs.sql = statement;
+          var result = await executeSql(rdsArgs);
+          // Store the SQL statement and the DB server response.
+          results.push([rdsArgs.sql, result]);
         }
-        sql = event.ResourceProperties.UpdateSqlScript;
       }
-      else if (physicalResourceId != event.PhysicalResourceId) {
-        // The physical resource ID must be updated when the resource is changed.
-        // This value will be sent in the next event.
-        event.PhysicalResourceId = physicalResourceId;
-        sql = event.ResourceProperties.CreateSqlScript;
-      }
-    }
-    else {
-      console.log("unexpected RequestType " + event.requestType);
-      await sendCFResponse(event, context, "SUCCESS", {}).catch(e => { });
-      return event;
-    }
 
-    // Parse the script into individual SQL statements
-    var statements = parseStatements(sql, delimiter);
-    console.log(statements);
+      console.log(JSON.stringify(results));
 
-    var results = [];
 
-    // Execute each SQL statement
-    for (var statement of statements) {
-      if (statement.length > 0) {
-        rdsArgs.sql = statement;
-        var result = await executeSql(rdsArgs);
-        // Store the SQL statement and the DB server response.
-        results.push([rdsArgs.sql, result]);
-      }
     }
     // Report success and results. The results may be used as a CF output.
-    await sendCFResponse(event, context, "SUCCESS", { results: JSON.stringify({}) }).catch(e => { });
+    await sendCFResponse(event, context, "SUCCESS", {}).catch(e => { });
   }
   catch (err) {
-    // Catch everything else - the handler must send a SUCCESS response to avoid hanging stack.
+    // Catch everything else
+    // The handler must send a SUCCESS response for "Delete" avoid hanging stack on rollback.
     console.log(err);
     await sendCFResponse(event, context, event.RequestType == "Delete" ? "SUCCESS" : "FAILED", {}).catch(e => { });
   }
@@ -125,11 +87,13 @@ exports.handler = async (event, context) => {
   return event;
 };
 
-// Regex that matches one or more spaces.
-let whitespace = /[\s\n]+/;
+// Regex that matches white space.
+let leadingWhitespace = /^\s+/;
+let whitespace = /\s+/;
 
 /**
- * Parse string of SQL statements separated by delimiter characters (or newlines).
+ * Parse a single string of SQL statements separated by delimiter characters
+ * into an array of individual statements.
  */
 function parseStatements(sql, delimiter) {
 
@@ -138,11 +102,9 @@ function parseStatements(sql, delimiter) {
   while (sql.length > 0) {
 
     // Strip leading white space
-    var c = sql[0];
-    if (c === " " || c === "\n") {
-      sql = sql.substring(1);
-      continue;
-    }
+    sql = sql.replace(leadingWhitespace, '');
+
+    if (sql.length == 0) break;
 
     // Use DELIMITER "statements" to change the delimiter value but do not execute as SQL.
     var isDelimiterCommand = false;
@@ -153,7 +115,7 @@ function parseStatements(sql, delimiter) {
 
     // Extract the statement from the script string
     var delimiterPos = sql.indexOf(delimiter);
-    if ((delimiterPos + 1) < sql.length && sql[delimiterPos+1] == delimiter) {
+    if ((delimiterPos + 1) < sql.length && sql[delimiterPos + 1] == delimiter) {
       delimiterPos++;
     }
 
@@ -163,11 +125,11 @@ function parseStatements(sql, delimiter) {
     if (!isDelimiterCommand) statements.push(statement);
 
     // Advance to the next statement
-    sql = sql.substring(statement.length+delimiter.length);
+    sql = sql.substring(statement.length + delimiter.length);
+
   }
 
   return statements;
-
 }
 
 /**

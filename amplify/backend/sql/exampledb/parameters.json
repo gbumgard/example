@@ -2,7 +2,6 @@
   "DBUserName": "admin",
   "DBClusterName": "exampledb",
   "ResourceLambdaFunction": "rdsSqlScriptResource",
-  "Delimiter": ";",
   "Database": "exampledb",
-  "NoEcho": true
+  "SqlDelimiter": ";"
 }

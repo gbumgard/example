@@ -1,8 +1,10 @@
 {
   "DBUserName": "admin",
   "DBClusterName": "exampledb",
-  "autoPause": true,
-  "minCapacity": 1,
-  "maxCapacity": 1,
-  "secondsUntilAutoPause": 36000
+  "AutoPause": true,
+  "MinCapacity": 1,
+  "MaxCapacity": 1,
+  "SecondsUntilAutoPause": 36000,
+  "SqlDelimiter": ";",
+  "DatabaseName": "exampledb"
 }

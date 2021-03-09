@@ -3,35 +3,7 @@
     "exampledb": {
       "service": "RDSCluster",
       "providerPlugin": "awscloudformation",
-      "dependsOn": []
-    }
-  },
-  "function": {
-    "rdsSqlDocumentLoader": {
-      "build": true,
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda",
-      "dependsOn": []
-    },
-    "rdsSqlScriptResource": {
-      "build": true,
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda"
-    }
-  },
-  "sql": {
-    "exampledb": {
-      "service": "Custom::RdsSqlResource",
-      "providerPlugin": "awscloudformation",
       "dependsOn": [
-        {
-          "category": "rds",
-          "resourceName": "exampledb",
-          "attributes": [
-            "Arn",
-            "SecretArn"
-          ]
-        },
         {
           "category": "function",
           "resourceName": "rdsSqlScriptResource",
@@ -40,6 +12,13 @@
           ]
         }
       ]
+    }
+  },
+  "function": {
+    "rdsSqlScriptResource": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
     }
   }
 }
